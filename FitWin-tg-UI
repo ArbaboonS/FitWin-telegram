@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fitness Tracker App</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/telegram-web-app/6.7.0/telegram-web-app.min.js"></script>
+<style>
+body {
+font-family: Arial, sans-serif;
+margin: 0;
+padding: 0;
+background-color: var(--tg-theme-bg-color, #ffffff);
+color: var(--tg-theme-text-color, #000000);
+}
+.container {
+max-width: 600px;
+margin: 0 auto;
+padding: 20px;
+}
+h1, h2 {
+text-align: center;
+}
+.button {
+display: block;
+width: 100%;
+padding: 10px;
+margin: 10px 0;
+background-color: var(--tg-theme-button-color, #3390ec);
+color: var(--tg-theme-button-text-color, #ffffff);
+border: none;
+border-radius: 5px;
+font-size: 16px;
+cursor: pointer;
+}
+.stats {
+display: flex;
+justify-content: space-around;
+margin-bottom: 20px;
+}
+.stat-item {
+text-align: center;
+}
+#map {
+width: 100%;
+height: 300px;
+background-color: #f0f0f0;
+margin-bottom: 20px;
+}
+.progress-bar {
+width: 100%;
+background-color: #e0e0e0;
+padding: 3px;
+border-radius: 3px;
+box-shadow: inset 0 1px 3px rgba(0, 0, 0, .2);
+margin-bottom: 20px;
+}
+.progress-bar-fill {
+display: block;
+height: 22px;
+background-color: #659cef;
+border-radius: 3px;
+transition: width 500ms ease-in-out;
+}
+.progress-bar-text {
+color: white;
+text-align: center;
+line-height: 22px;
+}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>Fitness Tracker App</h1>
+
+<div id="home" style="display: block;">
+<h2>Home</h2>
+<div class="stats">
+<div class="stat-item">
+<h3>Steps</h3>
+<p id="steps">0</p>
+</div>
+<div class="stat-item">
+<h3>Calories</h3>
+<p id="calories">0</p>
+</div>
+<div class="stat-item">
+<h3>Score</h3>
+<p id="score">0</p>
+</div>
+</div>
+<div id="map"></div>
+<button class="button" onclick="startTracking()">Start Tracking</button>
+<button class="button" onclick="showChallenges()">Challenges</button>
+<button class="button" onclick="showRewards()">Rewards</button>
+<button class="button" onclick="showInvite()">Invite Friends</button>
+<button class="button" onclick="showStats()">Stats & Progress</button>
+</div>
+
+<div id="challenges" style="display: none;">
+<h2>Challenges</h2>
+<button class="button" onclick="joinChallenge('5km Walk')">5km Walk Challenge</button>
+<button class="button" onclick="joinChallenge('10km Run')">10km Run Challenge</button>
+<button class="button" onclick="joinChallenge('Burn 500 Calories')">Burn 500 Calories Challenge</button>
+<button class="button" onclick="showHome()">Back to Home</button>
+</div>
+
+<div id="rewards" style="display: none;">
+<h2>Rewards</h2>
+<p>Your Score: <span id="rewardScore">0</span></p>
+<button class="button" onclick="claimReward(100)">Claim 1 TON (Requires 100 points)</button>
+<button class="button" onclick="claimReward(500)">Claim 5 TON (Requires 500 points)</button>
+<button class="button" onclick="claimReward(1000)">Claim 10 TON (Requires 1000 points)</button>
+<button class="button" onclick="showHome()">Back to Home</button>
+</div>
+
+<div id="invite" style="display: none;">
+<h2>Invite Friends</h2>
+<p>Your invite link:</p>
+<input type="text" id="inviteLink" readonly value="https://t.me/YourBotUsername?start=ref123456">
+<button class="button" onclick="copyInviteLink()">Copy Link</button>
+<button class="button" onclick="showHome()">Back to Home</button>
+</div>
+
+<div id="stats" style="display: none;">
+<h2>Stats & Progress</h2>
+<h3>Daily Goal Progress</h3>
+<div class="progress-bar">
+<span class="progress-bar-fill" style="width:0%;">
+<span class="progress-bar-text">0%</span>
+</span>
+</div>
+<h3>Weekly Stats</h3>
+<div id="weeklyStats"></div>
+<button class="button" onclick="showHome()">Back to Home</button>
+</div>
+</div>
+
+<script>
+let webApp = window.Telegram.WebApp;
+webApp.ready();
+
+let steps = 0;
+let calories = 0;
+let score = 0;
+let dailyGoal = 10000;
+let weeklyStats = {
+steps: [3000, 4500, 5000, 7500, 6000, 8000, 0],
+calories: [150, 225, 250, 375, 300, 400, 0],
+score: [30, 45, 50, 75, 60, 80, 0]
+};
+
+function showHome() {
+document.getElementById('home').style.display = 'block';
+document.getElementById('challenges').style.display = 'none';
+document.getElementById('rewards').style.display = 'none';
+document.getElementById('invite').style.display = 'none';
+document.getElementById('stats').style.display = 'none';
+}
+
+function showChallenges() {
+document.getElementById('home').style.display = 'none';
+document.getElementById('challenges').style.display = 'block';
+}
+
+function showRewards() {
+document.getElementById('home').style.display = 'none';
+document.getElementById('rewards').style.display = 'block';
+document.getElementById('rewardScore').textContent = score;
+}
+
+function showInvite() {
+document.getElementById('home').style.display = 'none';
+document.getElementById('invite').style.display = 'block';
+}
+
+function showStats() {
+document.getElementById('home').style.display = 'none';
+document.getElementById('stats').style.display = 'block';
+updateProgressBar();
+updateWeeklyStats();
+}
+
+function startTracking() {
+// Simulating step tracking
+setInterval(() => {
+steps += Math.floor(Math.random() * 10);
+calories += Math.floor(Math.random() * 5);
+score += Math.floor(Math.random() * 2);
+updateStats();
+}, 5000);
+}
+
+function updateStats() {
+document.getElementById('steps').textContent = steps;
+document.getElementById('calories').textContent = calories;
+document.getElementById('score').textContent = score;
+weeklyStats.steps[6] = steps;
+weeklyStats.calories[6] = calories;
+weeklyStats.score[6] = score;
+}
+
+function joinChallenge(challengeName) {
+webApp.showAlert(`You've joined the "${challengeName}" challenge!`);
+}
+
+function claimReward(requiredScore) {
+if (score >= requiredScore) {
+webApp.showAlert(`Congratulations! You've claimed your TON reward.`);
+score -= requiredScore;
+updateStats();
+} else {
+webApp.showAlert(`Not enough points. Keep working!`);
+}
+}
+
+function copyInviteLink() {
+let inviteLink = document.getElementById('inviteLink');
+inviteLink.select();
+document.execCommand('copy');
+webApp.showAlert('Invite link copied!');
+}
+
+function updateProgressBar() {
+let progressPercentage = Math.min((steps / dailyGoal) * 100, 100);
+let progressBar = document.querySelector('.progress-bar-fill');
+progressBar.style.width = progressPercentage + '%';
+progressBar.querySelector('.progress-bar-text').textContent = Math.round(progressPercentage) + '%';
+}
+
+function updateWeeklyStats() {
+let weeklyStatsDiv = document.getElementById('weeklyStats');
+weeklyStatsDiv.innerHTML = '';
+
+let days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+let stats = ['steps', 'calories', 'score'];
+
+stats.forEach(stat => {
+let maxValue = Math.max(...weeklyStats[stat]);
+weeklyStatsDiv.innerHTML += `<h4>${stat.charAt(0).toUpperCase() + stat.slice(1)}</h4>`;
+
+weeklyStats[stat].forEach((value, index) => {
+let percentage = (value / maxValue) * 100;
+weeklyStatsDiv.innerHTML += `
+<div class="progress-bar">
+<span class="progress-bar-fill" style="width:${percentage}%;">
+<span class="progress-bar-text">${days[index]}: ${value}</span>
+</span>
+</div>
+`;
+});
+});
+}
+
+// Initialize
+updateStats();
+</script>
+</body>
+</html>
